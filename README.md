@@ -1,279 +1,134 @@
 # scrape_linkedin
 
-## Introduction
+A Python package and Click CLI (`scrapeli`) for extracting structured JSON from LinkedIn personal profile and company HTML documents using BeautifulSoup and Selenium (`master` fork of `austinoboyle/scrape-linkedin-selenium`).
 
-`scrape_linkedin` is a python package to scrape all details from public LinkedIn
-profiles, turning the data into structured json. You can scrape Companies
-and user profiles with this package.
+> **Documentation Portal:** [docs/index.md](docs/index.md) ([Tutorials](docs/01-tutorials/index.md), [How-To Guides](docs/02-how-to-guides/index.md), [Reference](docs/03-reference/index.md), [Explanation](docs/04-explanation/index.md)) | [Examples](examples/companies-to-csv.py) | [License](LICENSE)
 
-**Warning**: LinkedIn has strong anti-scraping policies, they may blacklist ips making
-unauthenticated or unusual requests
+**Compliance & Responsible Use Notice:** LinkedIn enforces strict anti-scraping controls and Terms of Service restrictions, and may block IP addresses or accounts making automated or unauthenticated requests. Never attempt to bypass authentication, CAPTCHA, or anti-bot protections, and never commit `LI_AT` session cookies or credentials to source control. Use saved local HTML fixtures for offline parser development, tutorials, and automated testing.
 
-## Table of Contents
+## Architecture Overview
 
-<!--ts-->
-
-- [scrape_linkedin](#scrapelinkedin)
-  - [Introduction](#introduction)
-  - [Table of Contents](#table-of-contents)
-  - [Installation](#installation)
-    - [Install with pip](#install-with-pip)
-    - [Install from source](#install-from-source)
-    - [Tests](#tests)
-  - [Getting & Setting LI_AT](#getting--setting-liat)
-    - [Getting LI_AT](#getting-liat)
-    - [Setting LI_AT](#setting-liat)
-  - [Examples](#examples)
-  - [Usage](#usage)
-    - [Command Line](#command-line)
-    - [Python Package](#python-package)
-      - [Profiles](#profiles)
-      - [Companies](#companies)
-      - [config](#config)
-  - [Scraping in Parallel](#scraping-in-parallel)
-    - [Example](#example)
-    - [Configuration](#configuration)
-  - [Issues](#issues)
-
-<!-- Added by: austinoboyle, at: 2018-05-06T20:13-04:00 -->
-
-<!--te-->
+```mermaid
+flowchart LR
+    SRC["Saved HTML File or Selenium WebDriver"] --> SPLIT["Branch: -i input_file vs Live Driver"]
+    SPLIT -->|"-i/--input_file"| OFFLINE["Profile(html) or Company(4 HTML docs)"]
+    SPLIT -->|"--url / --user / --company + LI_AT"| DRIVER["ProfileScraper / CompanyScraper"]
+    DRIVER --> OFFLINE
+    OFFLINE --> RES["ResultsObject.to_dict() JSON"]
+    RES --> OUT["stdout pprint or -o/--output_file JSON"]
+```
 
 ## Installation
 
-### Install with pip
+Install directly from this fork over HTTPS or from a local clone:
 
-Run `pip install git+git://github.com/austinoboyle/scrape-linkedin-selenium.git`
+```bash
+pip install git+https://github.com/jmrenouard/scrape-linkedin-selenium.git
+```
 
-### Install from source
+Install editable or standard from a local checkout:
 
-`git clone https://github.com/austinoboyle/scrape-linkedin-selenium.git`
+```bash
+git clone https://github.com/jmrenouard/scrape-linkedin-selenium.git
+cd scrape-linkedin-selenium
+pip install .
+```
 
-Run `python setup.py install`
-
-### Tests
-
-Tests are (so far) only run on static html files. One of which is a linkedin
-profile, the other is just used to test some utility functions.
-
-## Getting & Setting LI_AT
-
-Because of Linkedin's anti-scraping measures, you must make your selenium
-browser look like an actual user. To do this, you need to add the li_at cookie
-to the selenium session.
-
-### Getting LI_AT
-
-1.  Navigate to www.linkedin.com and log in
-2.  Open browser developer tools (Ctrl-Shift-I or right click -> inspect
-    element)
-3.  Select the appropriate tab for your browser (**Application** on Chrome,
-    **Storage** on Firefox)
-4.  Click the **Cookies** dropdown on the left-hand menu, and select the
-    `www.linkedin.com` option
-5.  Find and copy the li_at **value**
-
-### Setting LI_AT
-
-There are two ways to set your li_at cookie:
-
-1.  Set the LI_AT environment variable
-    -   `$ export LI_AT=YOUR_LI_AT_VALUE`
-    -   **On Windows**: `C:/foo/bar> set LI_AT=YOUR_LI_AT_VALUE`
-2.  Pass the cookie as a parameter to the Scraper object.
-    > `>>> with ProfileScraper(cookie='YOUR_LI_AT_VALUE') as scraper:`
-
-A cookie value passed directly to the Scraper **will override your
-environment variable** if both are set.
-
-## Examples
-
-See [`/examples`](https://github.com/austinoboyle/scrape-linkedin-selenium/tree/master/examples)
+> **Note:** Importing top-level `scrape_linkedin` currently imports `selenium` and `joblib` (`requirements.txt`). When running offline HTML parser checks in environments without Selenium installed, see [docs/04-explanation/architecture-selector-drift-and-compliance.md](docs/04-explanation/architecture-selector-drift-and-compliance.md).
 
 ## Usage
 
-### Command Line
+### Command Line (`scrapeli`)
 
-scrape_linkedin comes with a command line argument module `scrapeli` created
-using [click](http://click.pocoo.org/5/).
+`scrape_linkedin/cli.py` registers the `scrapeli` console script via Click. Supported options verified against `scrape_linkedin/cli.py`:
 
-**Note: CLI only works with Personal Profiles as of now.**
+- `--url TEXT`: Full URL of a personal profile or URL target to scrape
+- `--user TEXT`: Username slug (`https://www.linkedin.com/in/<user>`)
+- `--company TEXT`: Company ID (`https://www.linkedin.com/company/<company>/`)
+- `-a, --attribute [personal_info|experiences|skills|accomplishments|interests|recommendations]`: Extract one `Profile` attribute instead of calling `to_dict()`
+- `-i, --input_file PATH`: Path to a local HTML file (used directly with `Profile`, no browser or `LI_AT` required)
+- `--headless`: Enable `HEADLESS_OPTIONS` for headless Chrome scraping
+- `-o, --output_file PATH`: Write extracted JSON output to a file instead of printing with `pprint`
+- `--driver [Chrome|Firefox]`: Selenium WebDriver class (default: `Chrome`)
+- `--help`: Show CLI help and exit (Click only enables `--help`, not `-h`)
 
-Options:
+Parse an offline profile HTML snapshot safely without network access:
 
--   --url : Full Url of the profile you want to scrape
--   --user: www.linkedin.com/in/USER
--   --driver: choose Browser type to use (Chrome/Firefox), **default: Chrome**
--   -a --attribute : return only a specific attribute (default: return all
-    attributes)
--   -i --input_file : Raw path to html file of the profile you want to scrape
--   -o --output_file: Raw path to output file for structured json profile (just
-    prints results by default)
--   -h --help : Show this screen.
+```bash
+scrapeli --help
+scrapeli -i test/html_files/profile.html -a skills -o skills.json
+```
 
-Examples:
+### Authentication (`LI_AT`) for Live Browser Sessions
 
--   Get Austin O'Boyle's profile info: `$ scrapeli --user=austinoboyle`
--   Get only the skills of Austin O'Boyle: `$ scrapeli --user=austinoboyle -a skills`
--   Parse stored html profile and save json output: `$ scrapeli -i /path/file.html -o output.json`
+When using `ProfileScraper`, `CompanyScraper`, `ConnectionScraper`, or `MyConnectionScraper` against live pages, supply a valid `LI_AT` cookie via environment variable or constructor keyword:
 
-### Python Package
+```bash
+export LI_AT="YOUR_LI_AT_VALUE"
+```
 
-#### Profiles
-
-Use `ProfileScraper` component to scrape profiles.
+In Python, passing `cookie=...` overrides `LI_AT` from the environment:
 
 ```python
 from scrape_linkedin import ProfileScraper
 
-with ProfileScraper() as scraper:
-    profile = scraper.scrape(user='austinoboyle')
+with ProfileScraper(cookie="YOUR_LI_AT_VALUE") as scraper:
+    profile = scraper.scrape(user="austinoboyle")
 print(profile.to_dict())
 ```
 
-`Profile` - the class that has properties to access all information pulled from
-a profile. Also has a to_dict() method that returns all of the data as a dict
+### Offline HTML Parsing (`Profile` and `Company`)
 
-    with open('profile.html', 'r') as profile_file:
-        profile = Profile(profile_file.read())
-
-    print (profile.skills)
-    # [{...} ,{...}, ...]
-    print (profile.experiences)
-    # {jobs: [...], volunteering: [...],...}
-    print (profile.to_dict())
-    # {personal_info: {...}, experiences: {...}, ...}
-
-**Structure of the fields scraped**
-
--   personal_info
-    -   name
-    -   company
-    -   school
-    -   headline
-    -   followers
-    -   summary
-    -   websites
-    -   email
-    -   phone
-    -   connected
-    -   image
--   skills
--   experiences
-    -   volunteering
-    -   jobs
-    -   education
--   interests
--   accomplishments
-    -   publications
-    -   cerfifications
-    -   patents
-    -   courses
-    -   projects
-    -   honors
-    -   test scores
-    -   languages
-    -   organizations
-
-#### Companies
-
-Use `CompanyScraper` component to scrape companies.
+`Profile(html)` parses a saved HTML string or file stream across `6` attributes (`personal_info`, `experiences`, `skills`, `accomplishments`, `interests`, `recommendations`):
 
 ```python
-from scrape_linkedin import CompanyScraper
+from scrape_linkedin import Profile
 
-with CompanyScraper() as scraper:
-    company = scraper.scrape(company='facebook')
-print(company.to_dict())
+with open("test/html_files/profile.html", "r", encoding="utf-8") as profile_file:
+    profile = Profile(profile_file.read())
+
+print(len(profile.skills))
+print(len(profile.experiences["jobs"]))
 ```
 
-`Company` - the class that has properties to access all information pulled from
-a company profile. There will be three properties: overview, jobs, and life.
-**Overview is the only one currently implemented.**
-
-    with open('overview.html', 'r') as overview,
-        open('jobs.html', 'r') as jobs,
-        open('life.html', 'r') as life:
-            company = Company(overview, jobs, life)
-
-    print (company.overview)
-    # {...}
-
-**Structure of the fields scraped**
-
--   overview
-    -   name
-    -   company_size
-    -   specialties
-    -   headquarters
-    -   founded
-    -   website
-    -   description
-    -   industry
-    -   num_employees
-    -   type
-    -   image
--   jobs **NOT YET IMPLEMENTED**
--   life **NOT YET IMPLEMENTED**
-
-#### config
-
-Pass these keyword arguments into the constructor of your Scraper to override
-default values. You may (for example) want to decrease/increase the timeout if
-your internet is very fast/slow.
-
--   _cookie_ **`{str}`**: li_at cookie value (overrides env variable)
-    -   **default: `None`**
--   _driver_ **`{selenium.webdriver}`**: driver type to use
-    -   **default: `selenium.webdriver.Chrome`**
--   _driver_options_ **`{dict}`**: kwargs to pass to driver constructor
-    -   **default: `{}`**
--   _scroll_pause_ **`{float}`**: time(s) to pause during scroll increments
-    -   **default: `0.1`**
--   _scroll_increment_ **`{int}`** num pixels to scroll down each time
-    -   **default: `300`**
--   _timeout_ **`{float}`**: default time to wait for async content to load
-    -   **default: `10`**
-
-## Scraping in Parallel
-
-New in version 0.2: built in parallel scraping functionality. Note that the
-up-front cost of starting a browser session is high, so in order for this to be
-beneficial, you will want to be scraping many (> 15) profiles.
-
-### Example
+`Company(overview, jobs, life, insights)` takes **4 HTML arguments** (`overview`, `jobs`, `life`, `insights`) and exposes `4` properties (`overview`, `jobs`, `life`, `insights`). Note that `jobs` and `life` currently return `None`, while `overview` stores extracted `<dl>` metadata fields inside `overview["metadata"]`:
 
 ```python
-from scrape_linkedin import scrape_in_parallel, CompanyScraper
+from scrape_linkedin import Company
 
-companies = ['facebook', 'google', 'amazon', 'microsoft', ...]
+with open("test/html_files/facebook_overview.html", "r", encoding="utf-8") as overview:
+    company = Company(overview.read(), "", "", "")
 
-#Scrape all companies, output to 'companies.json' file, use 4 browser instances
+print(company.overview)
+print(company.insights)
+```
+
+For full attribute schemas (`personal_info`, `experiences`, `accomplishments`, `overview`, `insights`) and `Scraper` constructor parameters (`cookie`, `driver`, `driver_options`, `scroll_pause`, `scroll_increment`, `timeout`), see [docs/03-reference/cli-api-and-parser-matrix.md](docs/03-reference/cli-api-and-parser-matrix.md).
+
+## Parallel Scraping (`scrape_in_parallel`)
+
+For batch scraping with pre-configured `selenium` + `joblib`:
+
+```python
+from scrape_linkedin import CompanyScraper, scrape_in_parallel
+
+companies = ["facebook", "linkedin"]
 scrape_in_parallel(
     scraper_type=CompanyScraper,
     items=companies,
     output_file="companies.json",
-    num_instances=4
+    num_instances=2,
 )
 ```
 
-### Configuration
+Also review [examples/companies-to-csv.py](examples/companies-to-csv.py) for pandas CSV export of company overviews.
 
-**Parameters:**
+## Testing & Known Suite Status
 
--   _scraper_type_ **`{scrape_linkedin.Scraper}`**: Scraper to use
--   _items_ **`{list}`**: List of items to be scraped
--   _output_file_ **`{str}`**: path to output file
--   _num_instances_ **`{int}`**: number of parallel instances of selenium to run
--   _temp_dir_ **`{str}`**: name of temporary directory to use to store data from intermediate steps
-    -   **default: 'tmp_data'**
--   _driver_ {selenium.webdriver}: driver to use for scraping
-    -   **default: selenium.webdriver.Chrome**
--   _driver_options_ **`{dict}`**: dict of keyword arguments to pass to the driver function.
-    -   **default: scrape_linkedin.utils.HEADLESS_OPTIONS**
--   _\*\*kwargs_ **`{any}`**: extra keyword arguments to pass to the `scraper_type` constructor for each job
+Offline documentation, CLI, compilation, and HTML-fixture verification tests live under `tests/` and run with standard library `unittest` (no Chrome driver or network access required):
 
-## Issues
+```bash
+python -B -m unittest discover -s tests -p "test_*.py" -v
+```
 
-Report bugs and feature requests
-[here](https://github.com/austinoboyle/scrape-linkedin-selenium/issues).
+Legacy upstream `test/` modules retain older fixture/selector assumptions documented in [docs/03-reference/cli-api-and-parser-matrix.md](docs/03-reference/cli-api-and-parser-matrix.md) (`test/scrapers_test.py` requires live Chrome/LinkedIn, `test/parsers_test.py` targets older HTML DOM selectors and 3-arg `Company(...)`, and `test/utils_test.py` tests `.1` CSS syntax rejected by `soupsieve` in `beautifulsoup4>=4.7`).
