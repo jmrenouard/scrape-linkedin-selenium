@@ -383,6 +383,15 @@ class TestDocsSyntaxDiataxisSTEAndMermaid(unittest.TestCase):
         self.assertIn("Company(overview, jobs, life, insights)", readme)
         self.assertIn("__pycache__/", (REPO_ROOT / ".gitignore").read_text(encoding="utf-8"))
 
+        for prereq_doc in (
+            DOCS_DIR / "01-tutorials" / "01-offline-html-profile-and-cli-tutorial.md",
+            DOCS_DIR / "02-how-to-guides" / "parse-offline-html-and-verify-docs.md",
+        ):
+            doc_text = prereq_doc.read_text(encoding="utf-8")
+            self.assertIn("selenium", doc_text)
+            self.assertIn("joblib", doc_text)
+            self.assertIn("requirements.txt", doc_text)
+
         mermaid_count = 0
         mmdc_bin = shutil.which("mmdc")
         errors: list[str] = []

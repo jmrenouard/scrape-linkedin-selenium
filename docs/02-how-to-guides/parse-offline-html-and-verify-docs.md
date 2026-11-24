@@ -6,9 +6,12 @@ CAUTION: Never commit `LI_AT` session cookies or credentials to Git. Exposed coo
 
 ## Prerequisites
 
-- Local clone of `scrape-linkedin-selenium` with Python 3, `beautifulsoup4`, and `click` installed.
+- Local clone of `scrape-linkedin-selenium` with Python 3.
+- Packages from `requirements.txt` (`beautifulsoup4`, `click`, `selenium`, and `joblib`) installed for CLI commands.
 - Saved LinkedIn HTML file in a readable local directory.
 
+NOTE: Offline `--help` and `-i` commands require no WebDriver binary or `LI_AT` cookie.
+NOTE: The script `tests/test_docs_tutorials_howtos.py` stubs missing `selenium` and `joblib` modules automatically.
 NOTE: Review supported flags and API attributes in [CLI, API, and Parser Reference](../03-reference/cli-api-and-parser-matrix.md).
 
 ## Steps

@@ -5,8 +5,10 @@ In this tutorial, you will load local HTML fixtures in Python, inspect extracted
 ## Prerequisites
 
 - A local checkout of `scrape-linkedin-selenium` on branch `master`.
-- Python 3 installed with `beautifulsoup4` and `click` (see [requirements.txt](../../requirements.txt)).
+- Python 3 installed with the full package list in [requirements.txt](../../requirements.txt) (`beautifulsoup4`, `click`, `selenium`, and `joblib`) for direct CLI or `from scrape_linkedin import ...` commands. No browser driver binary (`chromedriver`/`geckodriver`) is needed for `--help` or `-i`.
 - Zero LinkedIn credentials (`LI_AT` is not needed for offline HTML files).
+
+> **Note:** When running Step 4 in minimal environments without `selenium` or `joblib` installed, `tests/test_docs_tutorials_howtos.py` provides temporary in-memory module stubs automatically.
 
 ## Step 1: Inspect Available CLI Flags
 
